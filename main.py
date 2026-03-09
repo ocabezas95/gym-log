@@ -83,24 +83,24 @@ def workout_menu():
     print("3. Delete Exercise")
     print("4. Exit")
 
+# main function
+if __name__ == "__main__":    
+    while True:
+        workout_menu()
+        user_input = input("Enter your choice: ")
 
-# main program loop
-while True:
-    workout_menu()
-    user_input = input("Enter your choice: ")
+        if user_input == "1":
+            add_workout()
 
-    if user_input == "1":
-        add_workout()
+        elif user_input == "2":
+            view_workouts()
 
-    elif user_input == "2":
-        view_workouts()
+        elif user_input == "3":
+            delete_workout()
 
-    elif user_input == "3":
-        delete_workout()
+        elif user_input == "4":
+            print("Exiting the program. Goodbye!")
+            break
 
-    elif user_input == "4":
-        print("Exiting the program. Goodbye!")
-        break
-
-    else:
-        print("Invalid choice. Please try again.")
+        else:
+            print("Invalid choice. Please try again.")
