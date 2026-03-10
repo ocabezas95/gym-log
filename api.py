@@ -5,6 +5,7 @@ from main import load_workouts, save_workouts
 from fastapi.staticfiles import StaticFiles
 from fastapi import HTTPException
 from datetime import datetime
+from datetime import date
 
 app = FastAPI()
 
@@ -25,6 +26,17 @@ def home():
 def get_workouts():
     return load_workouts()
 
+@app.get("/api/volume/today")
+def get_today_volume():
+    workouts = load_workouts()
+    today_str = date.today().isoformat()
+    today_workouts = [w for w in workouts if w["date"].startswith(today_str)]
+    total_volume = sum(w.get("volume", 0) for w in today_workouts)
+    return {"date": today_str, "total_volume": total_volume}
+
+
+    
+
 
 @app.post("/api/workouts")
 def add_workout(workout: Workout):
@@ -34,6 +46,19 @@ def add_workout(workout: Workout):
         next_id = max(w["id"] for w in workouts) + 1
     else:
         next_id = 1
+    
+    # find previous max weight for the same exercise
+    previous_weights = [w["weight"] for w in workouts if w["exercise_name"].lower() == workout.exercise_name.lower()]
+
+    is_pr = False
+    if previous_weights:
+        if workout.weight > max(previous_weights):
+            is_pr = True
+    else:
+        is_pr = True  # First time doing this exercise, so it's a PR by default
+
+    # workout volume calculation (v = sets * reps * weight)
+    volume = workout.sets * workout.reps * workout.weight
 
     new_workout = {
         "id": next_id,
@@ -41,7 +66,9 @@ def add_workout(workout: Workout):
         "sets": workout.sets,
         "reps": workout.reps,
         "weight": workout.weight,
-        "date": datetime.today().isoformat()
+        "date": datetime.today().isoformat(),
+        "is_pr": is_pr,
+        "volume": volume
     }
 
     workouts.append(new_workout)
@@ -60,6 +87,8 @@ def update_workout(workout_id: int, updated_workout: Workout):
             workout["sets"] = updated_workout.sets
             workout["reps"] = updated_workout.reps
             workout["weight"] = updated_workout.weight
+            # Recalculate volume
+            workout["volume"] = workout["sets"] * workout["reps"] * workout["weight"]
             save_workouts(workouts)
             return workout
 
