@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi import HTTPException
 from main import load_workouts, save_workouts
+from fastapi.staticfiles import StaticFiles
 from datetime import datetime
 
 app = FastAPI()
@@ -14,17 +15,17 @@ class Workout(BaseModel):
     weight: float
 
 
-@app.get("/")
+@app.get("/api")
 def home():
     return {"message": " Gym Tracker API is running!"}
 
 
-@app.get("/workouts")
+@app.get("/api/workouts")
 def get_workouts():
     return load_workouts()
 
 
-@app.post("/workouts")
+@app.post("/api/workouts")
 def add_workout(workout: Workout):
     workouts = load_workouts()
 
@@ -48,7 +49,7 @@ def add_workout(workout: Workout):
     return new_workout
 
 
-@app.delete("/workouts/{workout_id}")
+@app.delete("/api/workouts/{workout_id}")
 def delete_workout(workout_id: int):
     workouts = load_workouts()
     workout_to_delete = next(
@@ -61,3 +62,7 @@ def delete_workout(workout_id: int):
     save_workouts(workouts)
 
     return {"message": "Workout deleted successfully"}
+
+
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
+
