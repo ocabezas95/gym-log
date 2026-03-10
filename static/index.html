@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Gym Log Tracker</title>
+    <link rel="stylesheet" type="text/css" href="/static/styles.css">
+</head>
+
+<body>
+    <h1>Gym Log Tracker</h1>
+    <p>Welcome to the Gym Log!</p>
+
+    <h2> Add Workout </h2>
+    <form id="WorkoutForm">
+        <label for="exercise_name">Exercise Name:</label>
+        <input type="text" id="exercise_name" name="exercise_name" required><br><br>
+
+        <label for="sets">Sets:</label>
+        <input type="number" id="sets" name="sets" required><br><br>
+
+        <label for="reps">Reps:</label>
+        <input type="number" id="reps" name="reps" required><br><br>
+
+        <label for="weight">Weight (lbs):</label>
+        <input type="number" id="weight" name="weight" step="0.1" required><br><br>
+
+        <button type="submit">Add Workout</button>
+    </form>
+    <h2>Workouts</h2>
+    <ul id="workout-list"></ul>
+
+    <script>
+        const API_URL = '/api/workouts';
+
+        async function fetchWorkouts() {
+            const response = await fetch(API_URL);
+            const workouts = await response.json();
+
+            const list = document.getElementById('workout-list');
+            list.innerHTML = '';
+            workouts.forEach(workout => {
+                const li = document.createElement('li');
+                li.textContent = `${workout.exercise_name} - ${workout.sets} sets x ${workout.reps} @ ${workout.weight} lbs`;
+                list.appendChild(li);
+            });
+        }
+
+        document.getElementById("WorkoutForm").addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const newWorkout = {
+                exercise_name: document.getElementById("exercise_name").value,
+                sets: parseInt(document.getElementById("sets").value),
+                reps: parseInt(document.getElementById("reps").value),
+                weight: parseFloat(document.getElementById("weight").value)
+            };
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newWorkout)
+            });
+            fetchWorkouts();
+        });
+        fetchWorkouts();
+    </script>
+</body>
+
+</html>
+
