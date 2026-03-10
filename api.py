@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from fastapi import HTTPException
 from main import load_workouts, save_workouts
 from fastapi.staticfiles import StaticFiles
+from fastapi import HTTPException
 from datetime import datetime
 
 app = FastAPI()
@@ -49,6 +50,22 @@ def add_workout(workout: Workout):
     return new_workout
 
 
+@app.put("/api/workouts/{workout_id}")
+def update_workout(workout_id: int, updated_workout: Workout):
+    workouts = load_workouts()
+
+    for workout in workouts:
+        if workout["id"] == workout_id:
+            workout["exercise_name"] = updated_workout.exercise_name
+            workout["sets"] = updated_workout.sets
+            workout["reps"] = updated_workout.reps
+            workout["weight"] = updated_workout.weight
+            save_workouts(workouts)
+            return workout
+
+    raise HTTPException(status_code=404, detail="Workout not found")
+
+
 @app.delete("/api/workouts/{workout_id}")
 def delete_workout(workout_id: int):
     workouts = load_workouts()
@@ -65,4 +82,3 @@ def delete_workout(workout_id: int):
 
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
-

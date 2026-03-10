@@ -269,6 +269,94 @@
       color: #e94560;
       background: rgba(233, 69, 96, 0.08);
     }
+    .edit-btn {
+      background: transparent;
+      border: 1px solid #1e1e3a;
+      border-radius: 6px;
+      padding: 6px 10px;
+      color: #555;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      margin-left: 8px;
+    }
+    .edit-btn:hover {
+      border-color: #4a6fa5;
+      color: #7eb3f5;
+      background: rgba(74, 111, 165, 0.08);
+    }
+
+    /* ── Modal ────────────────────────────────────────── */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: #111;
+      border: 1px solid #1e1e3a;
+      border-radius: 12px;
+      padding: 28px 28px 24px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+      animation: modal-in 0.18s ease;
+    }
+    @keyframes modal-in {
+      from { opacity: 0; transform: translateY(12px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .modal-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 14px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .modal-save-btn {
+      flex: 1;
+      background: #e94560;
+      border: none;
+      border-radius: 7px;
+      padding: 10px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .modal-save-btn:hover { background: #c73652; }
+    .modal-cancel-btn {
+      flex: 1;
+      background: transparent;
+      border: 1px solid #1e1e3a;
+      border-radius: 7px;
+      padding: 10px;
+      color: #666;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .modal-cancel-btn:hover { border-color: #555; color: #aaa; }
   </style>
 </head>
 <body>
@@ -340,6 +428,38 @@
       </div>
     </main>
 
+  </div>
+
+  <!-- EDIT MODAL -->
+  <div class="modal-backdrop" id="edit-modal">
+    <div class="modal">
+      <div class="modal-title">Edit Workout</div>
+      <form id="edit-form">
+        <input type="hidden" id="edit-id">
+        <div class="form-group">
+          <label for="edit-exercise">Exercise</label>
+          <input type="text" id="edit-exercise" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="edit-sets">Sets</label>
+            <input type="number" id="edit-sets" min="1" required>
+          </div>
+          <div class="form-group">
+            <label for="edit-reps">Reps</label>
+            <input type="number" id="edit-reps" min="1" required>
+          </div>
+          <div class="form-group">
+            <label for="edit-weight">Lbs</label>
+            <input type="number" id="edit-weight" step="0.1" min="0" required>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="modal-save-btn">Save</button>
+          <button type="button" class="modal-cancel-btn" id="modal-cancel">Cancel</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script>
@@ -431,7 +551,10 @@
                 <span class="badge">${w.weight} lbs</span>
               </div>
             </div>
-            <button class="delete-btn" data-id="${w.id}">✕ Remove</button>
+            <div style="display:flex">
+              <button class="edit-btn" data-id="${w.id}" data-name="${escapeHtml(w.exercise_name)}" data-sets="${w.sets}" data-reps="${w.reps}" data-weight="${w.weight}">✎ Edit</button>
+              <button class="delete-btn" data-id="${w.id}">✕ Remove</button>
+            </div>
           </div>`).join('');
 
         return `
@@ -444,6 +567,17 @@
       // Attach delete handlers after DOM is updated
       list.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', () => deleteWorkout(Number(btn.dataset.id)));
+      });
+
+      // Attach edit handlers
+      list.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => openEditModal({
+          id: Number(btn.dataset.id),
+          exercise_name: btn.dataset.name,
+          sets: Number(btn.dataset.sets),
+          reps: Number(btn.dataset.reps),
+          weight: Number(btn.dataset.weight),
+        }));
       });
     }
 
@@ -474,6 +608,62 @@
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
     }
+
+    // ── Edit modal ────────────────────────────────────────────────────
+    function openEditModal(workout) {
+      document.getElementById('edit-id').value = workout.id;
+      document.getElementById('edit-exercise').value = workout.exercise_name;
+      document.getElementById('edit-sets').value = workout.sets;
+      document.getElementById('edit-reps').value = workout.reps;
+      document.getElementById('edit-weight').value = workout.weight;
+      document.getElementById('edit-modal').classList.add('open');
+      document.getElementById('edit-exercise').focus();
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-modal').classList.remove('open');
+    }
+
+    document.getElementById('modal-cancel').addEventListener('click', closeEditModal);
+
+    // Close on backdrop click
+    document.getElementById('edit-modal').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeEditModal();
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeEditModal();
+    });
+
+    document.getElementById('edit-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = Number(document.getElementById('edit-id').value);
+      const btn = e.target.querySelector('.modal-save-btn');
+      btn.disabled = true;
+
+      const payload = {
+        exercise_name: document.getElementById('edit-exercise').value.trim(),
+        sets: parseInt(document.getElementById('edit-sets').value),
+        reps: parseInt(document.getElementById('edit-reps').value),
+        weight: parseFloat(document.getElementById('edit-weight').value),
+      };
+
+      try {
+        const res = await fetch(`${API}/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`Update failed: ${res.status}`);
+        closeEditModal();
+        fetchWorkouts();
+      } catch (err) {
+        console.error('Failed to update workout:', err);
+      } finally {
+        btn.disabled = false;
+      }
+    });
 
     // ── API calls ──────────────────────────────────────────────────────
     async function fetchWorkouts() {
