@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from fastapi import HTTPException
 from main import load_workouts, save_workouts, load_exercises
 from fastapi.staticfiles import StaticFiles
+from volume_engine import HybridVolumeEngine
 from datetime import datetime
 from datetime import date
 
@@ -58,6 +59,15 @@ def get_today_volume():
     today_workouts = [w for w in workouts if w["date"].startswith(today_str)]
     total_volume = sum(w.get("volume", 0) for w in today_workouts)
     return {"date": today_str, "total_volume": total_volume}
+
+@app.get("/api/volume/insights")
+def get_volume_insights():
+    workouts = load_workouts()
+    exercises = load_exercises()
+    engine = HybridVolumeEngine(workouts, exercises)
+    insights = engine.generate_stats()
+    return insights
+
 
 
 @app.post("/api/workouts")
