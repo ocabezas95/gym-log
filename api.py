@@ -1,9 +1,8 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi import HTTPException
-from main import load_workouts, save_workouts
+from main import load_workouts, save_workouts, load_exercises
 from fastapi.staticfiles import StaticFiles
-from fastapi import HTTPException
 from datetime import datetime
 from datetime import date
 
@@ -11,7 +10,7 @@ app = FastAPI()
 
 
 class Workout(BaseModel):
-    exercise_name: str
+    exercise_id: int
     sets: int
     reps: int
     weight: float
@@ -22,9 +21,35 @@ def home():
     return {"message": " Gym Tracker API is running!"}
 
 
+@app.get("/api/exercises")
+def get_exercises():
+    return load_exercises()
+
+
 @app.get("/api/workouts")
 def get_workouts():
-    return load_workouts()
+    workouts = load_workouts()
+    exercises = load_exercises()
+
+    enriched = []
+    for w in workouts:
+        exercise = next(
+            (e for e in exercises if e["id"] == w["exercise_id"]), None)
+        if exercise:
+            enriched.append({
+                **w,
+                "exercise_name": exercise["name"],
+                "muscle_group": exercise["muscle_group"],
+                "difficulty": exercise["difficulty"],
+                "equipment": exercise["equipment"]
+            })
+
+        else:
+            # If exercise not found, just return workout as is
+            enriched.append(w)
+
+    return enriched
+
 
 @app.get("/api/volume/today")
 def get_today_volume():
@@ -35,34 +60,30 @@ def get_today_volume():
     return {"date": today_str, "total_volume": total_volume}
 
 
-    
-
-
 @app.post("/api/workouts")
 def add_workout(workout: Workout):
+    exercises = load_exercises()
     workouts = load_workouts()
+    exercise = next(
+        (e for e in exercises if e["id"] == workout.exercise_id), None)
 
-    if workouts:
-        next_id = max(w["id"] for w in workouts) + 1
-    else:
-        next_id = 1
-    
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+
+    next_id = max((w["id"] for w in workouts), default=0) + 1
+
     # find previous max weight for the same exercise
-    previous_weights = [w["weight"] for w in workouts if w["exercise_name"].lower() == workout.exercise_name.lower()]
+    previous_weights = [w["weight"]
+                        for w in workouts if w["exercise_id"] == workout.exercise_id]
 
-    is_pr = False
-    if previous_weights:
-        if workout.weight > max(previous_weights):
-            is_pr = True
-    else:
-        is_pr = True  # First time doing this exercise, so it's a PR by default
+    is_pr = bool(previous_weights) and workout.weight > max(previous_weights)
 
     # workout volume calculation (v = sets * reps * weight)
     volume = workout.sets * workout.reps * workout.weight
 
     new_workout = {
         "id": next_id,
-        "exercise_name": workout.exercise_name,
+        "exercise_id": workout.exercise_id,
         "sets": workout.sets,
         "reps": workout.reps,
         "weight": workout.weight,
@@ -83,12 +104,13 @@ def update_workout(workout_id: int, updated_workout: Workout):
 
     for workout in workouts:
         if workout["id"] == workout_id:
-            workout["exercise_name"] = updated_workout.exercise_name
+            workout["exercise_id"] = updated_workout.exercise_id
             workout["sets"] = updated_workout.sets
             workout["reps"] = updated_workout.reps
             workout["weight"] = updated_workout.weight
             # Recalculate volume
-            workout["volume"] = workout["sets"] * workout["reps"] * workout["weight"]
+            workout["volume"] = workout["sets"] * \
+                workout["reps"] * workout["weight"]
             save_workouts(workouts)
             return workout
 

@@ -2,6 +2,13 @@ import json
 import os
 from datetime import datetime
 
+# load exercises from file
+def load_exercises():
+    if not os.path.exists('exercises.json'):
+        return []
+    with open('exercises.json', 'r') as file:
+        return json.load(file)
+
 # load workouts from file
 def load_workouts():
     if not os.path.exists('workouts.json'):
@@ -13,6 +20,11 @@ def load_workouts():
 def save_workouts(workouts):
     with open('workouts.json', 'w') as file:
         json.dump(workouts, file, indent=4)
+
+# save exercises to file
+def save_exercises(exercises):
+    with open('exercises.json', 'w') as file:
+        json.dump(exercises, file, indent=4)
 
 # add workout function
 def add_workout():
@@ -83,8 +95,9 @@ def workout_menu():
     print("3. Delete Exercise")
     print("4. Exit")
 
+
 # main function
-if __name__ == "__main__":    
+if __name__ == "__main__":
     while True:
         workout_menu()
         user_input = input("Enter your choice: ")
