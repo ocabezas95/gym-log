@@ -72,6 +72,45 @@ function toVolumeLabel(value) {
     return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(Math.round(value));
 }
 
+// === SET BUILDER ===
+
+function createSetRow(container, reps = "", weight = "") {
+    const idx = container.children.length + 1;
+    const row = document.createElement("div");
+    row.className = "set-row";
+    row.innerHTML = `
+        <span class="set-row-num">${idx}</span>
+        <input type="number" class="set-reps" placeholder="Reps" min="1" value="${reps}" required>
+        <input type="number" class="set-weight" placeholder="Lbs" step="0.1" min="0" value="${weight}" required>
+        <button type="button" class="remove-set-btn" title="Remove set">&times;</button>`;
+    row.querySelector(".remove-set-btn").addEventListener("click", () => {
+        row.remove();
+        renumberSets(container);
+    });
+    container.appendChild(row);
+    return row;
+}
+
+function renumberSets(container) {
+    container.querySelectorAll(".set-row").forEach((row, i) => {
+        row.querySelector(".set-row-num").textContent = i + 1;
+    });
+}
+
+function getSetsFromContainer(container) {
+    return Array.from(container.querySelectorAll(".set-row")).map((row) => ({
+        reps: Number(row.querySelector(".set-reps").value),
+        weight: Number(row.querySelector(".set-weight").value),
+    }));
+}
+
+function initSetBuilder(containerId, addBtnId) {
+    const container = document.getElementById(containerId);
+    const btn = document.getElementById(addBtnId);
+    createSetRow(container);
+    btn.addEventListener("click", () => createSetRow(container));
+}
+
 // === API ===
 
 async function fetchExercises() {
@@ -154,10 +193,11 @@ function populateExerciseSelects() {
 function updateStats(workouts) {
     document.getElementById("stat-count").textContent = workouts.length;
 
-    const totalVolume = workouts.reduce(
-        (sum, w) => sum + (w.volume ?? w.sets * w.reps * w.weight),
-        0,
-    );
+    const totalVolume = workouts.reduce((sum, w) => {
+        if (w.volume != null) return sum + w.volume;
+        if (Array.isArray(w.sets)) return sum + w.sets.reduce((s, x) => s + x.reps * x.weight, 0);
+        return sum + (w.sets || 0) * (w.reps || 0) * (w.weight || 0);
+    }, 0);
     document.getElementById("stat-volume").textContent = toVolumeLabel(totalVolume);
 
     const streak = calcStreak(workouts);
@@ -191,15 +231,23 @@ function renderWorkouts(workouts) {
             const entries = groups[dateKey]
                 .slice()
                 .sort((a, b) => b.id - a.id)
-                .map((w) => `
+                .map((w) => {
+                    const setsArr = Array.isArray(w.sets) ? w.sets : [];
+                    const vol = w.volume ?? setsArr.reduce((s, x) => s + x.reps * x.weight, 0);
+
+                    const setBadges = setsArr.length
+                        ? setsArr.map((s, i) => `<span class="badge">S${i + 1}: ${s.reps}&times;${s.weight}</span>`).join("")
+                        : `<span class="badge">${w.sets} sets</span><span class="badge">${w.reps} reps</span><span class="badge">${w.weight} lbs</span>`;
+
+                    const setsJson = escapeHtml(JSON.stringify(setsArr.length ? setsArr : [{ reps: w.reps, weight: w.weight }]));
+
+                    return `
                 <div class="workout-card">
                     <div>
                         <div class="workout-name">${escapeHtml(w.exercise_name || "Unknown exercise")}</div>
                         <div class="workout-meta">
-                            <span class="badge">${w.sets} sets</span>
-                            <span class="badge">${w.reps} reps</span>
-                            <span class="badge">${w.weight} lbs</span>
-                            <span class="badge volume-badge">⚡ ${Math.round(w.volume ?? w.sets * w.reps * w.weight).toLocaleString()} vol</span>
+                            ${setBadges}
+                            <span class="badge volume-badge">⚡ ${Math.round(vol).toLocaleString()} vol</span>
                             ${w.is_pr ? '<span class="pr-badge">🏆 PR</span>' : ""}
                         </div>
                     </div>
@@ -207,12 +255,11 @@ function renderWorkouts(workouts) {
                         <button class="edit-btn"
                             data-id="${w.id}"
                             data-exercise-id="${w.exercise_id}"
-                            data-sets="${w.sets}"
-                            data-reps="${w.reps}"
-                            data-weight="${w.weight}">Edit</button>
+                            data-sets="${setsJson}">Edit</button>
                         <button class="delete-btn" data-id="${w.id}">Remove</button>
                     </div>
-                </div>`)
+                </div>`;
+                })
                 .join("");
 
             return `
@@ -232,9 +279,7 @@ function renderWorkouts(workouts) {
         btn.addEventListener("click", () => openEditModal({
             id: Number(btn.dataset.id),
             exercise_id: Number(btn.dataset.exerciseId),
-            sets: Number(btn.dataset.sets),
-            reps: Number(btn.dataset.reps),
-            weight: Number(btn.dataset.weight),
+            sets: JSON.parse(btn.dataset.sets),
         }));
     });
 }
@@ -263,9 +308,13 @@ function launchConfetti() {
 function openEditModal(workout) {
     document.getElementById("edit-id").value = workout.id;
     document.getElementById("edit-exercise").value = String(workout.exercise_id);
-    document.getElementById("edit-sets").value = String(workout.sets);
-    document.getElementById("edit-reps").value = String(workout.reps);
-    document.getElementById("edit-weight").value = String(workout.weight);
+
+    const container = document.getElementById("edit-set-rows");
+    container.innerHTML = "";
+    const sets = workout.sets || [];
+    sets.forEach((s) => createSetRow(container, s.reps, s.weight));
+    if (!sets.length) createSetRow(container);
+
     document.getElementById("edit-modal").classList.add("open");
     document.getElementById("edit-exercise").focus();
 }
@@ -279,16 +328,17 @@ document.getElementById("workout-form").addEventListener("submit", async (e) => 
     const btn = e.target.querySelector(".submit-btn");
     btn.disabled = true;
 
+    const container = document.getElementById("set-rows");
     const payload = {
         exercise_id: Number(document.getElementById("exercise_id").value),
-        sets: Number(document.getElementById("sets").value),
-        reps: Number(document.getElementById("reps").value),
-        weight: Number(document.getElementById("weight").value),
+        sets: getSetsFromContainer(container),
     };
 
     try {
         const added = await addWorkout(payload);
         e.target.reset();
+        container.innerHTML = "";
+        createSetRow(container);
         if (exercises.length) {
             document.getElementById("exercise_id").value = String(exercises[0].id);
         }
@@ -310,9 +360,7 @@ document.getElementById("edit-form").addEventListener("submit", async (e) => {
     const id = Number(document.getElementById("edit-id").value);
     const payload = {
         exercise_id: Number(document.getElementById("edit-exercise").value),
-        sets: Number(document.getElementById("edit-sets").value),
-        reps: Number(document.getElementById("edit-reps").value),
-        weight: Number(document.getElementById("edit-weight").value),
+        sets: getSetsFromContainer(document.getElementById("edit-set-rows")),
     };
 
     try {
@@ -345,7 +393,353 @@ async function init() {
     } catch (err) {
         console.error("Failed to load exercises:", err);
     }
+    initSetBuilder("set-rows", "add-set-btn");
+    document.getElementById("edit-add-set-btn").addEventListener("click", () => {
+        createSetRow(document.getElementById("edit-set-rows"));
+    });
     await Promise.all([fetchWorkouts(), fetchTodayVolume()]);
+    initTabs();
+}
+
+// === TABS ===
+
+function initTabs() {
+    document.querySelectorAll(".tab-btn").forEach((btn) => {
+        btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+    });
+}
+
+function switchTab(tabName) {
+    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tabName));
+    document.querySelectorAll(".view-panel").forEach((p) => p.classList.toggle("active", p.id === `view-${tabName}`));
+    if (tabName === "analytics") loadAnalytics();
+}
+
+// === ANALYTICS ORCHESTRATOR ===
+
+let chartInstances = {};
+
+function destroyChart(key) {
+    if (chartInstances[key]) {
+        chartInstances[key].destroy();
+        delete chartInstances[key];
+    }
+}
+
+async function loadAnalytics() {
+    try {
+        const [history, insights] = await Promise.all([
+            fetch("/api/volume/history?days=28").then((r) => r.json()),
+            fetch("/api/volume/insights").then((r) => r.json()),
+        ]);
+        const historyLong = await fetch("/api/volume/history?days=90").then((r) => r.json());
+
+        renderVolumeTrend(history);
+        renderMuscleBreakdown(insights.calendar_week?.current_week || {});
+        renderACWRGauges(insights.rolling_window?.by_muscle || {});
+        renderHeatmap(historyLong);
+        setupExerciseProgressSelector();
+    } catch (err) {
+        console.error("Failed to load analytics:", err);
+    }
+}
+
+// === CHART: Volume Trend (Bar) ===
+
+function renderVolumeTrend(history) {
+    destroyChart("volumeTrend");
+    const ctx = document.getElementById("chart-volume-trend");
+    if (!ctx) return;
+
+    const labels = history.map((d) => {
+        const dt = new Date(d.date + "T00:00:00");
+        return dt.toLocaleDateString("en-US", { weekday: "short", day: "numeric" });
+    });
+    const data = history.map((d) => d.total_volume);
+
+    chartInstances.volumeTrend = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [{
+                label: "Volume (lbs)",
+                data,
+                backgroundColor: "rgba(230, 57, 70, 0.6)",
+                borderColor: "rgba(230, 57, 70, 1)",
+                borderWidth: 1,
+                borderRadius: 4,
+                hoverBackgroundColor: "rgba(230, 57, 70, 0.85)",
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (c) => `${Math.round(c.raw).toLocaleString()} lbs`,
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    ticks: { color: "#666", font: { size: 10 }, maxRotation: 45 },
+                    grid: { color: "rgba(255,255,255,0.04)" },
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: "#666",
+                        font: { size: 10 },
+                        callback: (v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v),
+                    },
+                    grid: { color: "rgba(255,255,255,0.04)" },
+                },
+            },
+        },
+    });
+}
+
+// === CHART: Muscle Breakdown (Doughnut) ===
+
+const MUSCLE_COLORS = {
+    Chest: "#e63946", Back: "#457b9d", Legs: "#2dc653", Shoulders: "#f59e0b",
+    Biceps: "#8b5cf6", Triceps: "#ec4899", Abs: "#06b6d4", Calves: "#84cc16",
+    Traps: "#f97316", Forearms: "#a78bfa",
+};
+
+function renderMuscleBreakdown(currentWeek) {
+    destroyChart("muscleBreakdown");
+    const ctx = document.getElementById("chart-muscle-breakdown");
+    if (!ctx) return;
+
+    const muscles = Object.keys(currentWeek);
+    if (!muscles.length) {
+        ctx.parentElement.innerHTML = '<p class="analytics-empty">No muscle data this week</p>';
+        return;
+    }
+
+    const colors = muscles.map((m) => MUSCLE_COLORS[m] || "#666");
+
+    chartInstances.muscleBreakdown = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+            labels: muscles,
+            datasets: [{
+                data: muscles.map((m) => Math.round(currentWeek[m])),
+                backgroundColor: colors,
+                borderColor: "#1a1a1a",
+                borderWidth: 2,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: "bottom",
+                    labels: { color: "#ccc", font: { size: 11 }, padding: 12, usePointStyle: true },
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (c) => ` ${c.label}: ${c.raw.toLocaleString()} lbs`,
+                    },
+                },
+            },
+        },
+    });
+}
+
+// === CHART: Exercise Progression (Line) ===
+
+function setupExerciseProgressSelector() {
+    const select = document.getElementById("progress-exercise-select");
+    if (!select || !exercises.length) return;
+
+    select.innerHTML = '<option value="">— Select exercise —</option>' +
+        exercises.map((ex) => `<option value="${ex.id}">${escapeHtml(ex.name)}</option>`).join("");
+
+    // Remove old listener by replacing node
+    const fresh = select.cloneNode(true);
+    select.parentNode.replaceChild(fresh, select);
+
+    fresh.addEventListener("change", async () => {
+        const id = Number(fresh.value);
+        if (!id) return;
+        try {
+            const data = await fetch(`/api/volume/exercise/${id}/progress`).then((r) => r.json());
+            renderExerciseProgress(data);
+        } catch (err) {
+            console.error("Failed to load exercise progress:", err);
+        }
+    });
+}
+
+function renderExerciseProgress(data) {
+    destroyChart("exerciseProgress");
+    const ctx = document.getElementById("chart-exercise-progress");
+    if (!ctx) return;
+
+    if (!data.length) {
+        ctx.parentElement.innerHTML = '<p class="analytics-empty">No history for this exercise</p><canvas id="chart-exercise-progress"></canvas>';
+        return;
+    }
+
+    const labels = data.map((d) => {
+        const dt = new Date(d.date + "T00:00:00");
+        return dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    });
+
+    chartInstances.exerciseProgress = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: "Max Weight (lbs)",
+                    data: data.map((d) => d.max_weight),
+                    borderColor: "#e63946",
+                    backgroundColor: "rgba(230, 57, 70, 0.1)",
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointBackgroundColor: "#e63946",
+                    fill: true,
+                    tension: 0.3,
+                    yAxisID: "y",
+                },
+                {
+                    label: "Session Volume",
+                    data: data.map((d) => d.total_volume),
+                    borderColor: "#457b9d",
+                    backgroundColor: "rgba(69, 123, 157, 0.1)",
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointBackgroundColor: "#457b9d",
+                    fill: true,
+                    tension: 0.3,
+                    yAxisID: "y1",
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: "index", intersect: false },
+            plugins: {
+                legend: {
+                    labels: { color: "#ccc", font: { size: 11 }, usePointStyle: true },
+                },
+            },
+            scales: {
+                x: {
+                    ticks: { color: "#666", font: { size: 10 } },
+                    grid: { color: "rgba(255,255,255,0.04)" },
+                },
+                y: {
+                    position: "left",
+                    title: { display: true, text: "Weight (lbs)", color: "#666", font: { size: 10 } },
+                    ticks: { color: "#e63946", font: { size: 10 } },
+                    grid: { color: "rgba(255,255,255,0.04)" },
+                },
+                y1: {
+                    position: "right",
+                    title: { display: true, text: "Volume", color: "#666", font: { size: 10 } },
+                    ticks: {
+                        color: "#457b9d",
+                        font: { size: 10 },
+                        callback: (v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v),
+                    },
+                    grid: { drawOnChartArea: false },
+                },
+            },
+        },
+    });
+}
+
+// === ACWR STRESS GAUGES ===
+
+function renderACWRGauges(byMuscle) {
+    const container = document.getElementById("acwr-gauges");
+    if (!container) return;
+
+    const muscles = Object.keys(byMuscle);
+    if (!muscles.length) {
+        container.innerHTML = '<p class="acwr-empty">Not enough data for workload analysis. Keep training!</p>';
+        return;
+    }
+
+    container.innerHTML = muscles.map((muscle) => {
+        const d = byMuscle[muscle];
+        const acwr = d.acwr || 0;
+        const zone = d.stress_zone || "Undertraining";
+
+        let colorClass, zoneName;
+        if (zone === "green") { colorClass = "green"; zoneName = "Optimal"; }
+        else if (zone === "yellow") { colorClass = "yellow"; zoneName = "Caution"; }
+        else if (zone === "red") { colorClass = "red"; zoneName = "High Risk"; }
+        else { colorClass = "gray"; zoneName = "Low"; }
+
+        // Clamp bar width: ACWR 0–2.5 maps to 0–100%
+        const pct = Math.min(100, (acwr / 2.5) * 100);
+
+        return `
+            <div class="acwr-row">
+                <span class="acwr-label">${escapeHtml(muscle)}</span>
+                <div class="acwr-bar-track">
+                    <div class="acwr-bar-fill acwr-bar-fill--${colorClass}" style="width:${pct}%"></div>
+                </div>
+                <span class="acwr-value">${acwr.toFixed(2)}</span>
+                <span class="acwr-zone-tag acwr-zone-tag--${colorClass}">${zoneName}</span>
+            </div>`;
+    }).join("");
+}
+
+// === HEATMAP ===
+
+function renderHeatmap(historyLong) {
+    const grid = document.getElementById("heatmap-grid");
+    if (!grid) return;
+
+    // Build a volume lookup
+    const volMap = {};
+    let maxVol = 0;
+    for (const d of historyLong) {
+        volMap[d.date] = d.total_volume;
+        if (d.total_volume > maxVol) maxVol = d.total_volume;
+    }
+
+    const today = new Date();
+    const todayKey = localDateKey(today);
+
+    // Go back 13 weeks (91 days) and align to Monday
+    const start = new Date(today);
+    start.setDate(start.getDate() - 90);
+    // Align to Monday
+    while (start.getDay() !== 1) start.setDate(start.getDate() - 1);
+
+    const cells = [];
+    const cursor = new Date(start);
+
+    while (cursor <= today) {
+        const key = localDateKey(cursor);
+        const vol = volMap[key] || 0;
+        let level = "";
+        if (vol > 0 && maxVol > 0) {
+            const ratio = vol / maxVol;
+            if (ratio <= 0.25) level = "l1";
+            else if (ratio <= 0.5) level = "l2";
+            else if (ratio <= 0.75) level = "l3";
+            else level = "l4";
+        }
+        const isToday = key === todayKey;
+        const dt = new Date(cursor);
+        const title = `${dt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}: ${Math.round(vol).toLocaleString()} lbs`;
+        cells.push(`<div class="heatmap-cell ${level ? "heatmap-cell--" + level : ""} ${isToday ? "heatmap-cell--today" : ""}" title="${escapeHtml(title)}"></div>`);
+        cursor.setDate(cursor.getDate() + 1);
+    }
+
+    grid.innerHTML = cells.join("");
 }
 
 init();

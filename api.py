@@ -3,18 +3,24 @@ from pydantic import BaseModel
 from fastapi import HTTPException
 from main import load_workouts, save_workouts, load_exercises
 from fastapi.staticfiles import StaticFiles
-from volume_engine import HybridVolumeEngine
+from fastapi import HTTPException
 from datetime import datetime
 from datetime import date
+from volume_engine import HybridVolumeEngine
+
+from typing import List
 
 app = FastAPI()
 
 
-class Workout(BaseModel):
-    exercise_id: int
-    sets: int
+class SetEntry(BaseModel):
     reps: int
     weight: float
+
+
+class Workout(BaseModel):
+    exercise_id: int
+    sets: List[SetEntry]
 
 
 @app.get("/api")
@@ -60,14 +66,23 @@ def get_today_volume():
     total_volume = sum(w.get("volume", 0) for w in today_workouts)
     return {"date": today_str, "total_volume": total_volume}
 
+
 @app.get("/api/volume/insights")
 def get_volume_insights():
-    workouts = load_workouts()
-    exercises = load_exercises()
-    engine = HybridVolumeEngine(workouts, exercises)
-    insights = engine.generate_stats()
-    return insights
+    engine = HybridVolumeEngine(load_workouts(), load_exercises())
+    return engine.generate_stats()
 
+
+@app.get("/api/volume/history")
+def get_volume_history(days: int = 28):
+    engine = HybridVolumeEngine(load_workouts(), load_exercises())
+    return engine.daily_volume_history(days)
+
+
+@app.get("/api/volume/exercise/{exercise_id}/progress")
+def get_exercise_progress(exercise_id: int):
+    engine = HybridVolumeEngine(load_workouts(), load_exercises())
+    return engine.exercise_weight_history(exercise_id)
 
 
 @app.post("/api/workouts")
@@ -82,21 +97,27 @@ def add_workout(workout: Workout):
 
     next_id = max((w["id"] for w in workouts), default=0) + 1
 
+    sets_data = [s.model_dump() for s in workout.sets]
+    max_weight = max(s["weight"] for s in sets_data)
+    volume = sum(s["reps"] * s["weight"] for s in sets_data)
+
     # find previous max weight for the same exercise
-    previous_weights = [w["weight"]
-                        for w in workouts if w["exercise_id"] == workout.exercise_id]
+    previous_weights = []
+    for w in workouts:
+        if w["exercise_id"] != workout.exercise_id:
+            continue
+        if isinstance(w.get("sets"), list):
+            for s in w["sets"]:
+                previous_weights.append(s.get("weight", 0))
+        elif "weight" in w:
+            previous_weights.append(w["weight"])
 
-    is_pr = bool(previous_weights) and workout.weight > max(previous_weights)
-
-    # workout volume calculation (v = sets * reps * weight)
-    volume = workout.sets * workout.reps * workout.weight
+    is_pr = previous_weights and max_weight > max(previous_weights)
 
     new_workout = {
         "id": next_id,
         "exercise_id": workout.exercise_id,
-        "sets": workout.sets,
-        "reps": workout.reps,
-        "weight": workout.weight,
+        "sets": sets_data,
         "date": datetime.today().isoformat(),
         "is_pr": is_pr,
         "volume": volume
@@ -115,12 +136,11 @@ def update_workout(workout_id: int, updated_workout: Workout):
     for workout in workouts:
         if workout["id"] == workout_id:
             workout["exercise_id"] = updated_workout.exercise_id
-            workout["sets"] = updated_workout.sets
-            workout["reps"] = updated_workout.reps
-            workout["weight"] = updated_workout.weight
-            # Recalculate volume
-            workout["volume"] = workout["sets"] * \
-                workout["reps"] * workout["weight"]
+            sets_data = [s.model_dump() for s in updated_workout.sets]
+            workout["sets"] = sets_data
+            workout.pop("reps", None)
+            workout.pop("weight", None)
+            workout["volume"] = sum(s["reps"] * s["weight"] for s in sets_data)
             save_workouts(workouts)
             return workout
 
