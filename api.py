@@ -7,8 +7,9 @@ from fastapi import HTTPException
 from datetime import datetime
 from datetime import date
 from volume_engine import HybridVolumeEngine
+from progression_engine import ProgressionEngine
 
-from typing import List
+from typing import List, Optional
 
 app = FastAPI()
 
@@ -16,11 +17,13 @@ app = FastAPI()
 class SetEntry(BaseModel):
     reps: int
     weight: float
+    rir: Optional[int] = None
 
 
 class Workout(BaseModel):
     exercise_id: int
     sets: List[SetEntry]
+    rep_range: Optional[List[int]] = None
 
 
 @app.get("/api")
@@ -118,6 +121,7 @@ def add_workout(workout: Workout):
         "id": next_id,
         "exercise_id": workout.exercise_id,
         "sets": sets_data,
+        "rep_range": workout.rep_range,
         "date": datetime.today().isoformat(),
         "is_pr": is_pr,
         "volume": volume
@@ -126,7 +130,9 @@ def add_workout(workout: Workout):
     workouts.append(new_workout)
     save_workouts(workouts)
 
-    return new_workout
+    progression = ProgressionEngine(exercises).analyze(new_workout)
+
+    return {"workout": new_workout, "progression": progression}
 
 
 @app.put("/api/workouts/{workout_id}")
