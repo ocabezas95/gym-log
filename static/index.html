@@ -181,6 +181,206 @@
             cursor: not-allowed;
         }
 
+        /* ── Rep Range Input ──────────────────────────────── */
+        .rep-range-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .rep-range-row input {
+            width: 100%;
+            background: #0f0f0f;
+            border: 1px solid #1e1e3a;
+            border-radius: 5px;
+            padding: 7px 8px;
+            color: #fff;
+            font-size: 12px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .rep-range-row input:focus {
+            border-color: #e94560;
+        }
+
+        .rep-range-row input::placeholder {
+            color: #333;
+        }
+
+        /* ── Progression Panel ────────────────────────────── */
+        .progression-panel {
+            margin-top: 16px;
+            border-top: 1px solid #1e1e3a;
+            padding-top: 16px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .progression-panel.visible {
+            display: flex;
+        }
+
+        .progression-panel h4 {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #666;
+        }
+
+        .progression-flag {
+            background: linear-gradient(135deg, #1a2a1a, #0f1a0f);
+            border: 1px solid #2dc653;
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+
+        .progression-flag-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .progression-flag-icon {
+            font-size: 16px;
+        }
+
+        .progression-flag-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #2dc653;
+        }
+
+        .progression-flag-reason {
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 10px;
+        }
+
+        .progression-weight-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .progression-weight-label {
+            font-size: 11px;
+            color: #aaa;
+            white-space: nowrap;
+        }
+
+        .progression-weight-input {
+            width: 80px;
+            background: #0a1a0a;
+            border: 1px solid #2dc653;
+            border-radius: 5px;
+            padding: 5px 8px;
+            color: #2dc653;
+            font-size: 13px;
+            font-weight: 700;
+            outline: none;
+            text-align: center;
+        }
+
+        .progression-weight-input:focus {
+            box-shadow: 0 0 0 2px rgba(45, 198, 83, 0.2);
+        }
+
+        .progression-weight-unit {
+            font-size: 11px;
+            color: #555;
+        }
+
+        .progression-alert {
+            border-radius: 8px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .progression-alert--too-easy {
+            background: #1a1800;
+            border: 1px solid #b45309;
+        }
+
+        .progression-alert--failure {
+            background: #1a0a0a;
+            border: 1px solid #e63946;
+        }
+
+        .progression-alert-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .progression-alert-title {
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .progression-alert--too-easy .progression-alert-title { color: #f59e0b; }
+        .progression-alert--failure .progression-alert-title  { color: #e63946; }
+
+        .progression-alert-msg {
+            font-size: 11px;
+            color: #888;
+        }
+
+        .progression-alert-weight-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .progression-alert-weight-label {
+            font-size: 11px;
+            color: #aaa;
+        }
+
+        .progression-alert-weight-input {
+            width: 72px;
+            border-radius: 5px;
+            padding: 4px 6px;
+            font-size: 12px;
+            font-weight: 700;
+            outline: none;
+            text-align: center;
+        }
+
+        .progression-alert--too-easy .progression-alert-weight-input {
+            background: #120f00;
+            border: 1px solid #b45309;
+            color: #f59e0b;
+        }
+
+        .progression-alert--failure .progression-alert-weight-input {
+            background: #130505;
+            border: 1px solid #e63946;
+            color: #e63946;
+        }
+
+        .progression-dismiss {
+            background: transparent;
+            border: 1px solid #1e1e3a;
+            border-radius: 5px;
+            color: #555;
+            font-size: 11px;
+            padding: 5px 10px;
+            cursor: pointer;
+            align-self: flex-start;
+            transition: color 0.15s, border-color 0.15s;
+        }
+
+        .progression-dismiss:hover {
+            color: #999;
+            border-color: #444;
+        }
+
         /* ── Main Content ─────────────────────────────────── */
         .content {
             flex: 1;
@@ -606,9 +806,23 @@
 
         .set-row {
             display: grid;
-            grid-template-columns: 28px 1fr 1fr auto;
+            grid-template-columns: 28px 1fr 1fr 64px auto;
             gap: 6px;
             align-items: center;
+        }
+
+        .set-rir-wrap {
+            position: relative;
+        }
+
+        .set-rir-wrap select {
+            width: 100%;
+            padding: 4px 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+            background: white;
+            cursor: pointer;
         }
 
         .set-row-num {
@@ -969,8 +1183,22 @@
                         </div>
                         <div class="set-rows" id="set-rows"></div>
                     </div>
+                    <div class="form-group">
+                        <label>Target Reps (optional)</label>
+                        <div class="rep-range-row">
+                            <input type="number" id="rep-range-min" placeholder="Min (e.g. 8)" min="1">
+                            <input type="number" id="rep-range-max" placeholder="Max (e.g. 12)" min="1">
+                        </div>
+                    </div>
                     <button type="submit" class="submit-btn">+ Add Workout</button>
                 </form>
+
+                <!-- Progression feedback, shown after submission -->
+                <div class="progression-panel" id="progression-panel">
+                    <h4>Progression Feedback</h4>
+                    <div id="progression-content"></div>
+                    <button class="progression-dismiss" id="progression-dismiss">Dismiss</button>
+                </div>
             </div>
         </aside>
 
@@ -1343,7 +1571,7 @@
         }
 
         // ── Set builder helpers ──────────────────────────────────────────────
-        function createSetRow(container, reps, weight) {
+        function createSetRow(container, reps, weight, rir) {
                 const idx = container.children.length + 1;
                 const row = document.createElement('div');
                 row.className = 'set-row';
@@ -1351,6 +1579,16 @@
                 <span class="set-row-num">${idx}</span>
                 <input type="number" class="set-reps" placeholder="Reps" min="1" value="${reps ?? ''}" required>
                 <input type="number" class="set-weight" placeholder="Lbs" step="0.1" min="0" value="${weight ?? ''}" required>
+                <div class="set-rir-wrap">
+                  <select class="set-rir">
+                    <option value="5" ${rir == 5 ? 'selected' : ''}>5 — Too Easy</option>
+                    <option value="4" ${rir == 4 ? 'selected' : ''}>4 — Comfortable</option>
+                    <option value="3" ${rir == null || rir == 3 ? 'selected' : ''}>3 — Moderate</option>
+                    <option value="2" ${rir == 2 ? 'selected' : ''}>2 — Challenging</option>
+                    <option value="1" ${rir == 1 ? 'selected' : ''}>1 — Very Hard</option>
+                    <option value="0" ${rir == 0 ? 'selected' : ''}>0 — Failure</option>
+                  </select>
+                </div>
                 <button type="button" class="remove-set-btn" title="Remove set">&times;</button>`;
                 row.querySelector('.remove-set-btn').addEventListener('click', () => {
                     row.remove();
@@ -1366,10 +1604,15 @@
             }
 
             function getSetsFromContainer(container) {
-                return Array.from(container.querySelectorAll('.set-row')).map(row => ({
-                    reps: Number(row.querySelector('.set-reps').value),
-                    weight: Number(row.querySelector('.set-weight').value),
-                }));
+                return Array.from(container.querySelectorAll('.set-row')).map(row => {
+                    const rirVal = row.querySelector('.set-rir')?.value;
+                    const entry = {
+                        reps: Number(row.querySelector('.set-reps').value),
+                        weight: Number(row.querySelector('.set-weight').value),
+                    };
+                    if (rirVal !== '' && rirVal != null) entry.rir = Number(rirVal);
+                    return entry;
+                });
             }
 
             function initSetBuilder(containerId, addBtnId) {
@@ -1517,9 +1760,12 @@
                 btn.disabled = true;
 
                 const setContainer = document.getElementById('set-rows');
+                const minReps = document.getElementById('rep-range-min').value;
+                const maxReps = document.getElementById('rep-range-max').value;
                 const payload = {
                     exercise_id: exerciseId,
                     sets: getSetsFromContainer(setContainer),
+                    rep_range: (minReps && maxReps) ? [Number(minReps), Number(maxReps)] : null,
                 };
 
                 try {
@@ -1530,17 +1776,83 @@
                     });
                     if (!res.ok) throw new Error(`Add failed: ${res.status}`);
                     const added = await res.json();
+                    const workout = added.workout ?? added;
+                    const exerciseName = document.getElementById('exercise-search').value;
                     e.target.reset();
                     setContainer.innerHTML = '';
                     createSetRow(setContainer);
                     document.getElementById('exercise_id').value = '';
                     fetchWorkouts();
-                    if (added.is_pr) launchConfetti();
+                    if (workout.is_pr) launchConfetti();
+                    renderProgressionPanel(added.progression, exerciseName);
                 } catch (err) {
                     console.error('Failed to add workout:', err);
                 } finally {
                     btn.disabled = false;
                 }
+            });
+
+            // ── Progression Panel ──────────────────────────────────────────────
+            function renderProgressionPanel(progression, exerciseName) {
+                const panel = document.getElementById('progression-panel');
+                const content = document.getElementById('progression-content');
+
+                if (!progression) {
+                    panel.classList.remove('visible');
+                    return;
+                }
+
+                const parts = [];
+
+                if (progression.flag_for_increase) {
+                    const suggestedWeight = progression.suggested_weight ?? '';
+                    parts.push(`
+                        <div class="progression-flag">
+                            <div class="progression-flag-header">
+                                <span class="progression-flag-icon">&#x2191;</span>
+                                <span class="progression-flag-title">Ready to Progress${exerciseName ? ' — ' + escapeHtml(exerciseName) : ''}</span>
+                            </div>
+                            <div class="progression-flag-reason">${escapeHtml(progression.reason || '')}</div>
+                            <div class="progression-weight-row">
+                                <span class="progression-weight-label">Next session weight:</span>
+                                <input type="number" class="progression-weight-input" value="${suggestedWeight}" step="2.5" min="0">
+                                <span class="progression-weight-unit">lbs</span>
+                            </div>
+                        </div>`);
+                }
+
+                (progression.rir_alerts || []).forEach(alert => {
+                    const cls = alert.type === 'too_easy' ? 'progression-alert--too-easy' : 'progression-alert--failure';
+                    const icon = alert.type === 'too_easy' ? '&#x26A1;' : '&#x26A0;';
+                    const title = alert.type === 'too_easy' ? 'Too Easy' : 'Failure Alert';
+                    const weightRow = alert.suggested_weight != null ? `
+                        <div class="progression-alert-weight-row">
+                            <span class="progression-alert-weight-label">Suggested weight:</span>
+                            <input type="number" class="progression-alert-weight-input" value="${alert.suggested_weight}" step="2.5" min="0">
+                            <span class="progression-weight-unit">lbs</span>
+                        </div>` : '';
+                    parts.push(`
+                        <div class="progression-alert ${cls}">
+                            <div class="progression-alert-header">
+                                <span>${icon}</span>
+                                <span class="progression-alert-title">${title}</span>
+                            </div>
+                            <div class="progression-alert-msg">${escapeHtml(alert.message)}</div>
+                            ${weightRow}
+                        </div>`);
+                });
+
+                if (!parts.length) {
+                    panel.classList.remove('visible');
+                    return;
+                }
+
+                content.innerHTML = parts.join('');
+                panel.classList.add('visible');
+            }
+
+            document.getElementById('progression-dismiss').addEventListener('click', () => {
+                document.getElementById('progression-panel').classList.remove('visible');
             });
 
             // ── Tabs ───────────────────────────────────────────────────────────
