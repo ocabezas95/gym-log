@@ -381,6 +381,37 @@
             border-color: #444;
         }
 
+        /* ── Session phases ───────────────────────────────── */
+        .phase { display: none; flex-direction: column; padding: 18px 20px; flex: 1; overflow-y: auto; }
+        .phase.active { display: flex; flex-direction: column; }
+
+        .session-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .session-title { color: #fff; font-size: 13px; font-weight: 600; }
+        .session-counter { color: #666; font-size: 11px; }
+        .cancel-btn { background: transparent; border: 1px solid #1e1e3a; border-radius: 5px; color: #555; font-size: 10px; padding: 4px 8px; cursor: pointer; transition: all 0.2s; }
+        .cancel-btn:hover { border-color: #e94560; color: #e94560; }
+
+        .coaching-msg { border-radius: 6px; padding: 10px 12px; font-size: 12px; margin-bottom: 12px; display: none; }
+        .coaching-msg.visible { display: block; }
+        .coaching-msg--easy { background: #1a1800; border: 1px solid #b45309; color: #f59e0b; }
+        .coaching-msg--good { background: #0a1a0a; border: 1px solid #2dc653; color: #2dc653; }
+        .coaching-msg--hard { background: #1a100a; border: 1px solid #f97316; color: #f97316; }
+        .coaching-msg--failure-light { background: #1a0808; border: 1px solid #e94560; color: #e94560; }
+        .coaching-msg--failure-heavy { background: #1a0808; border: 1px solid #e94560; color: #e94560; }
+
+        .rest-timer { text-align: center; padding: 12px; background: #0f0f0f; border: 1px solid #1e1e3a; border-radius: 8px; margin-bottom: 12px; display: none; }
+        .rest-timer.visible { display: block; }
+        .rest-timer-time { font-family: 'Montserrat', sans-serif; font-size: 28px; font-weight: 700; color: #e94560; line-height: 1; }
+        .rest-timer-label { color: #555; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; margin-top: 4px; }
+
+        .sets-recap { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+        .set-recap-row { display: flex; gap: 8px; font-size: 11px; color: #666; padding: 5px 8px; background: #0f0f0f; border-radius: 4px; }
+        .set-recap-num { color: #444; font-weight: 600; width: 16px; }
+        .set-recap-val { color: #aaa; }
+
+        .session-error { color: #e94560; font-size: 11px; margin-top: 8px; display: none; }
+        .session-error.visible { display: block; }
+
         /* ── Main Content ─────────────────────────────────── */
         .content {
             flex: 1;
@@ -1165,40 +1196,86 @@
                 </div>
             </div>
 
-            <div class="form-section">
-                <h3>Add Workout</h3>
-                <form id="workout-form">
+            <!-- PHASE 1: SETUP -->
+            <div class="phase active" id="phase-setup">
+                <h3 style="color:#555;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px">Start Session</h3>
+                <div class="form-group">
+                    <label>Exercise</label>
+                    <div class="autocomplete-wrap">
+                        <input type="text" id="exercise-search" placeholder="Type to search…" autocomplete="off">
+                        <input type="hidden" id="exercise_id">
+                        <ul class="autocomplete-list" id="exercise-list"></ul>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Target Reps (optional)</label>
+                    <div class="rep-range-row">
+                        <input type="number" id="rep-range-min" placeholder="Min (e.g. 8)" min="1">
+                        <input type="number" id="rep-range-max" placeholder="Max (e.g. 12)" min="1">
+                    </div>
+                    <div id="rep-range-error" style="color:#e94560;font-size:10px;margin-top:4px;display:none">Max must be ≥ min</div>
+                </div>
+                <div class="form-row">
                     <div class="form-group">
-                        <label>Exercise</label>
-                        <div class="autocomplete-wrap">
-                            <input type="text" id="exercise-search" placeholder="Type to search…" autocomplete="off"
-                                required>
-                            <input type="hidden" id="exercise_id">
-                            <ul class="autocomplete-list" id="exercise-list"></ul>
-                        </div>
-                    </div>
-                    <div class="sets-builder">
-                        <div class="sets-header">
-                            <span class="sets-title">Sets</span>
-                            <button type="button" class="add-set-btn" id="add-set-btn">+ Add Set</button>
-                        </div>
-                        <div class="set-rows" id="set-rows"></div>
+                        <label>Target Sets</label>
+                        <input type="number" id="target-sets" placeholder="e.g. 4" min="1">
                     </div>
                     <div class="form-group">
-                        <label>Target Reps (optional)</label>
-                        <div class="rep-range-row">
-                            <input type="number" id="rep-range-min" placeholder="Min (e.g. 8)" min="1">
-                            <input type="number" id="rep-range-max" placeholder="Max (e.g. 12)" min="1">
-                        </div>
+                        <label>Rest (seconds)</label>
+                        <input type="number" id="rest-seconds" placeholder="e.g. 90" min="0" max="600">
                     </div>
-                    <button type="submit" class="submit-btn">+ Add Workout</button>
-                </form>
+                </div>
+                <button type="button" class="submit-btn" id="start-session-btn" disabled>Start Session</button>
+            </div>
 
-                <!-- Progression feedback, shown after submission -->
-                <div class="progression-panel" id="progression-panel">
-                    <h4>Progression Feedback</h4>
+            <!-- PHASE 2: ACTIVE SESSION -->
+            <div class="phase" id="phase-active">
+                <div class="session-header">
+                    <div>
+                        <div class="session-title" id="session-exercise-name">—</div>
+                        <div class="session-counter" id="session-counter">Set 1 of —</div>
+                    </div>
+                    <button type="button" class="cancel-btn" id="cancel-session-btn">Cancel</button>
+                </div>
+
+                <div class="form-group">
+                    <label>Reps</label>
+                    <input type="number" id="log-reps" placeholder="Reps" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Weight (lbs)</label>
+                    <input type="number" id="log-weight" placeholder="0" step="0.5" min="0">
+                </div>
+                <div class="form-group">
+                    <label>RIR</label>
+                    <select id="log-rir">
+                        <option value="">—</option>
+                        <option value="0">0 — Failure</option>
+                        <option value="1">1 — Very Hard</option>
+                        <option value="2">2 — Challenging</option>
+                        <option value="3">3 — Moderate</option>
+                        <option value="4">4 — Comfortable</option>
+                        <option value="5">5+ — Too Easy</option>
+                    </select>
+                </div>
+                <button type="button" class="submit-btn" id="log-set-btn" disabled>Log Set</button>
+
+                <div class="coaching-msg" id="coaching-msg"></div>
+                <div class="rest-timer" id="rest-timer">
+                    <div class="rest-timer-time" id="timer-display">0:00</div>
+                    <div class="rest-timer-label" id="timer-label">Rest</div>
+                </div>
+
+                <div class="sets-recap" id="sets-recap"></div>
+                <div class="session-error" id="session-error">Failed to save workout. Please try again.</div>
+            </div>
+
+            <!-- PHASE 3: COMPLETE -->
+            <div class="phase" id="phase-complete">
+                <div class="progression-panel" id="progression-panel" style="margin-top:0;border-top:none;padding-top:0">
+                    <h4>Session Complete</h4>
                     <div id="progression-content"></div>
-                    <button class="progression-dismiss" id="progression-dismiss">Dismiss</button>
+                    <button class="progression-dismiss" id="progression-dismiss">Start Next Exercise</button>
                 </div>
             </div>
         </aside>
@@ -1753,47 +1830,6 @@
                 }
             }
 
-            // ── Form submission ────────────────────────────────────────────────
-            document.getElementById('workout-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const exerciseId = Number(document.getElementById('exercise_id').value);
-                if (!exerciseId) { alert('Please select an exercise from the list.'); return; }
-                const btn = e.target.querySelector('.submit-btn');
-                btn.disabled = true;
-
-                const setContainer = document.getElementById('set-rows');
-                const minReps = document.getElementById('rep-range-min').value;
-                const maxReps = document.getElementById('rep-range-max').value;
-                const payload = {
-                    exercise_id: exerciseId,
-                    sets: getSetsFromContainer(setContainer),
-                    rep_range: (minReps && maxReps) ? [Number(minReps), Number(maxReps)] : null,
-                };
-
-                try {
-                    const res = await fetch(API, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
-                    });
-                    if (!res.ok) throw new Error(`Add failed: ${res.status}`);
-                    const added = await res.json();
-                    const workout = added.workout ?? added;
-                    const exerciseName = document.getElementById('exercise-search').value;
-                    e.target.reset();
-                    setContainer.innerHTML = '';
-                    createSetRow(setContainer);
-                    document.getElementById('exercise_id').value = '';
-                    fetchWorkouts();
-                    if (workout.is_pr) launchConfetti();
-                    renderProgressionPanel(added.progression, exerciseName);
-                } catch (err) {
-                    console.error('Failed to add workout:', err);
-                } finally {
-                    btn.disabled = false;
-                }
-            });
-
             // ── Progression Panel ──────────────────────────────────────────────
             function renderProgressionPanel(progression, exerciseName) {
                 const panel = document.getElementById('progression-panel');
@@ -1852,10 +1888,6 @@
                 content.innerHTML = parts.join('');
                 panel.classList.add('visible');
             }
-
-            document.getElementById('progression-dismiss').addEventListener('click', () => {
-                document.getElementById('progression-panel').classList.remove('visible');
-            });
 
             // ── Tabs ───────────────────────────────────────────────────────────
             function initTabs() {
@@ -2054,7 +2086,6 @@
                 await fetchExercises();
                 initAutocomplete('exercise-search', 'exercise-list', 'exercise_id');
                 editAC = initAutocomplete('edit-exercise-search', 'edit-exercise-list', 'edit-exercise-id');
-                initSetBuilder('set-rows', 'add-set-btn');
                 document.getElementById('edit-add-set-btn').addEventListener('click', () => {
                     createSetRow(document.getElementById('edit-set-rows'));
                 });
