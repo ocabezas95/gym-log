@@ -1538,6 +1538,144 @@
             showPhase('setup');
         }
 
+        // ── Log Set validation ─────────────────────────────────────────────
+        function initLogSetForm() {
+            ['log-reps', 'log-weight', 'log-rir'].forEach(id => {
+                document.getElementById(id).addEventListener('input', validateLogSetForm);
+                document.getElementById(id).addEventListener('change', validateLogSetForm);
+            });
+            document.getElementById('log-set-btn').addEventListener('click', logSet);
+        }
+
+        function validateLogSetForm() {
+            const reps = document.getElementById('log-reps').value;
+            const weight = document.getElementById('log-weight').value;
+            const rir = document.getElementById('log-rir').value;
+            const valid = reps !== '' && Number(reps) >= 1
+                && weight !== ''
+                && rir !== '';
+            document.getElementById('log-set-btn').disabled = !valid;
+        }
+
+        // ── Coaching messages ──────────────────────────────────────────────
+        const COACHING = [
+            { css: 'coaching-msg--easy',
+              match: (rir) => rir >= 5,
+              text: 'Too easy. Consider increasing weight for the next set.' },
+            { css: 'coaching-msg--good',
+              match: (rir, reps, minReps) => rir >= 2 && rir <= 4,
+              text: 'Good working range. Keep the same weight.' },
+            { css: 'coaching-msg--hard',
+              match: (rir) => rir === 1,
+              text: 'Challenging set. You\'re close to failure. Keep form tight.' },
+            { css: 'coaching-msg--failure-heavy',
+              match: (rir, reps, minReps) => rir === 0 && reps < minReps,
+              text: 'Too heavy. Consider reducing weight next session.' },
+            { css: 'coaching-msg--failure-light',
+              match: (rir, reps, minReps) => rir === 0 && reps >= minReps,
+              text: 'Set completed at failure. Monitor fatigue.' },
+        ];
+
+        function showCoachingMsg(rir, reps) {
+            const minReps = session.targetReps ? session.targetReps[0] : 0;
+            const rule = COACHING.find(r => r.match(rir, reps, minReps));
+            if (!rule) return;
+            const el = document.getElementById('coaching-msg');
+            el.className = `coaching-msg visible ${rule.css}`;
+            el.textContent = rule.text;
+        }
+
+        function hideCoachingMsg() {
+            const el = document.getElementById('coaching-msg');
+            el.className = 'coaching-msg';
+            el.textContent = '';
+        }
+
+        // ── Rest timer ─────────────────────────────────────────────────────
+        function startTimer(seconds) {
+            if (session.timerHandle) clearInterval(session.timerHandle);
+            if (seconds <= 0) {
+                showTimerReady();
+                return;
+            }
+            session.timerRemaining = seconds;
+            updateTimerDisplay(seconds);
+            document.getElementById('rest-timer').classList.add('visible');
+            document.getElementById('timer-label').textContent = 'Resting';
+
+            session.timerHandle = setInterval(() => {
+                session.timerRemaining -= 1;
+                if (session.timerRemaining <= 0) {
+                    clearInterval(session.timerHandle);
+                    session.timerHandle = null;
+                    showTimerReady();
+                } else {
+                    updateTimerDisplay(session.timerRemaining);
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            document.getElementById('timer-display').textContent =
+                `${m}:${String(s).padStart(2, '0')}`;
+        }
+
+        function showTimerReady() {
+            document.getElementById('timer-display').textContent = '0:00';
+            document.getElementById('timer-label').textContent = 'Rest over — ready for next set.';
+        }
+
+        function hideTimer() {
+            if (session.timerHandle) {
+                clearInterval(session.timerHandle);
+                session.timerHandle = null;
+            }
+            document.getElementById('rest-timer').classList.remove('visible');
+        }
+
+        // ── Sets recap ─────────────────────────────────────────────────────
+        function renderSetsRecap() {
+            const container = document.getElementById('sets-recap');
+            container.innerHTML = session.loggedSets.map((s, i) =>
+                `<div class="set-recap-row">
+                    <span class="set-recap-num">${i + 1}</span>
+                    <span class="set-recap-val">${s.reps} reps</span>
+                    <span class="set-recap-val">${s.weight} lbs</span>
+                    <span class="set-recap-val">RIR ${s.rir}</span>
+                </div>`
+            ).join('');
+        }
+
+        // ── Log Set ────────────────────────────────────────────────────────
+        async function logSet() {
+            const reps = Number(document.getElementById('log-reps').value);
+            const weight = Number(document.getElementById('log-weight').value);
+            const rir = Number(document.getElementById('log-rir').value);
+
+            const entry = { reps, weight, rir };
+            session.loggedSets.push(entry);
+
+            // Show coaching message and start timer
+            showCoachingMsg(rir, reps);
+            startTimer(session.restSeconds);
+            renderSetsRecap();
+
+            if (session.loggedSets.length >= session.targetSets) {
+                // Disable Log Set while completing
+                document.getElementById('log-set-btn').disabled = true;
+                await completeSession();
+            } else {
+                // Prepare form for next set
+                updateSetCounter();
+                document.getElementById('log-reps').value = '';
+                document.getElementById('log-weight').value = weight; // prefill from last set
+                document.getElementById('log-rir').value = '';
+                document.getElementById('log-set-btn').disabled = true;
+            }
+        }
+
         // ── XSS protection ─────────────────────────────────────────────────
         function escapeHtml(str) {
             return String(str ?? '')
