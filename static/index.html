@@ -818,10 +818,11 @@
         .set-rir-wrap select {
             width: 100%;
             padding: 4px 6px;
-            border: 1px solid #ccc;
+            border: 1px solid #1e1e3a;
             border-radius: 4px;
             font-size: 13px;
-            background: white;
+            background: #0f0f0f;
+            color: #e0e0e0;
             cursor: pointer;
         }
 
@@ -1581,12 +1582,13 @@
                 <input type="number" class="set-weight" placeholder="Lbs" step="0.1" min="0" value="${weight ?? ''}" required>
                 <div class="set-rir-wrap">
                   <select class="set-rir">
-                    <option value="5" ${rir == 5 ? 'selected' : ''}>5 — Too Easy</option>
+                    <option value="" disabled ${!rir && rir !== 0 ? 'selected' : ''}>—</option>
+                    <option value="5" ${rir == 5 ? 'selected' : ''}>5+ — Too Easy</option>
                     <option value="4" ${rir == 4 ? 'selected' : ''}>4 — Comfortable</option>
-                    <option value="3" ${rir == null || rir == 3 ? 'selected' : ''}>3 — Moderate</option>
+                    <option value="3" ${rir == 3 ? 'selected' : ''}>3 — Moderate</option>
                     <option value="2" ${rir == 2 ? 'selected' : ''}>2 — Challenging</option>
                     <option value="1" ${rir == 1 ? 'selected' : ''}>1 — Very Hard</option>
-                    <option value="0" ${rir == 0 ? 'selected' : ''}>0 — Failure</option>
+                    <option value="0" ${rir === 0 ? 'selected' : ''}>0 — Failure</option>
                   </select>
                 </div>
                 <button type="button" class="remove-set-btn" title="Remove set">&times;</button>`;
