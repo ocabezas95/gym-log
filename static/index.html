@@ -1392,6 +1392,152 @@
         const API = '/api/workouts';
         let exercises = [];
 
+        // ── Session state ──────────────────────────────────────────────────
+        const session = {
+            exerciseId: null,
+            exerciseName: '',
+            targetSets: 0,
+            targetReps: null,   // [min, max] or null
+            restSeconds: 0,
+            loggedSets: [],
+            timerHandle: null,
+            timerRemaining: 0,
+        };
+
+        function showPhase(name) {
+            document.querySelectorAll('.phase').forEach(p => p.classList.remove('active'));
+            document.getElementById(`phase-${name}`).classList.add('active');
+        }
+
+        // ── Setup form validation ──────────────────────────────────────────
+        function validateSetupForm() {
+            const exerciseId = Number(document.getElementById('exercise_id').value);
+            const targetSets = Number(document.getElementById('target-sets').value);
+            const restSeconds = document.getElementById('rest-seconds').value;
+            const minReps = document.getElementById('rep-range-min').value;
+            const maxReps = document.getElementById('rep-range-max').value;
+
+            const repRangeError = document.getElementById('rep-range-error');
+            let repRangeValid = true;
+            if (minReps && maxReps && Number(maxReps) < Number(minReps)) {
+                repRangeError.style.display = 'block';
+                repRangeValid = false;
+            } else {
+                repRangeError.style.display = 'none';
+            }
+
+            const valid = exerciseId > 0
+                && targetSets >= 1
+                && restSeconds !== ''
+                && Number(restSeconds) >= 0
+                && Number(restSeconds) <= 600
+                && repRangeValid;
+
+            document.getElementById('start-session-btn').disabled = !valid;
+        }
+
+        function initSetupForm() {
+            ['exercise_id', 'target-sets', 'rest-seconds', 'rep-range-min', 'rep-range-max'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('input', validateSetupForm);
+            });
+            // exercise_id is a hidden input updated by the autocomplete — also trigger on exercise-search change
+            document.getElementById('exercise-search').addEventListener('input', () => {
+                // If user clears the search box, also clear the hidden ID so Start Session stays disabled
+                if (!document.getElementById('exercise-search').value.trim()) {
+                    document.getElementById('exercise_id').value = '';
+                }
+                validateSetupForm();
+            });
+
+            // Pre-populate target reps from exercise default when an exercise is picked (spec F5)
+            // The autocomplete sets exercise_id then fires a synthetic 'change' event we can listen for
+            document.getElementById('exercise_id').addEventListener('change', () => {
+                const exerciseId = Number(document.getElementById('exercise_id').value);
+                const exercise = exercises.find(e => e.id === exerciseId);
+                if (exercise?.rep_range) {
+                    document.getElementById('rep-range-min').value = exercise.rep_range[0];
+                    document.getElementById('rep-range-max').value = exercise.rep_range[1];
+                } else {
+                    document.getElementById('rep-range-min').value = '';
+                    document.getElementById('rep-range-max').value = '';
+                }
+                validateSetupForm();
+            });
+
+            document.getElementById('start-session-btn').addEventListener('click', startSession);
+        }
+
+        function startSession() {
+            const exerciseId = Number(document.getElementById('exercise_id').value);
+            const exerciseName = document.getElementById('exercise-search').value;
+            const targetSets = Number(document.getElementById('target-sets').value);
+            const restSeconds = Number(document.getElementById('rest-seconds').value);
+            const minReps = document.getElementById('rep-range-min').value;
+            const maxReps = document.getElementById('rep-range-max').value;
+
+            // Find exercise to get suggested_weight and rep_range defaults
+            const exercise = exercises.find(e => e.id === exerciseId);
+
+            session.exerciseId = exerciseId;
+            session.exerciseName = exerciseName;
+            session.targetSets = targetSets;
+            session.restSeconds = restSeconds;
+            session.loggedSets = [];
+            session.timerHandle = null;
+            session.timerRemaining = 0;
+
+            // Build rep range: use form input if provided, else fall back to exercise default
+            if (minReps && maxReps) {
+                session.targetReps = [Number(minReps), Number(maxReps)];
+            } else if (minReps) {
+                session.targetReps = [Number(minReps), Number(minReps)];
+            } else if (exercise?.rep_range) {
+                session.targetReps = exercise.rep_range;
+                // Reflect defaults back into form fields for clarity
+                document.getElementById('rep-range-min').value = exercise.rep_range[0];
+                document.getElementById('rep-range-max').value = exercise.rep_range[1];
+            } else {
+                session.targetReps = null;
+            }
+
+            // Update Phase 2 header
+            document.getElementById('session-exercise-name').textContent = exerciseName;
+            updateSetCounter();
+
+            // Prefill weight from suggested_weight if available
+            const suggestedWeight = exercise?.suggested_weight ?? null;
+            const weightInput = document.getElementById('log-weight');
+            weightInput.value = (suggestedWeight != null) ? suggestedWeight : '';
+
+            // Reset RIR dropdown and reps
+            document.getElementById('log-reps').value = '';
+            document.getElementById('log-rir').value = '';
+            document.getElementById('log-set-btn').disabled = true;
+
+            // Clear coaching and timer
+            hideCoachingMsg();
+            hideTimer();
+            document.getElementById('sets-recap').innerHTML = '';
+            document.getElementById('session-error').classList.remove('visible');
+
+            showPhase('active');
+        }
+
+        function updateSetCounter() {
+            document.getElementById('session-counter').textContent =
+                `Set ${session.loggedSets.length + 1} of ${session.targetSets}`;
+        }
+
+        function cancelSession() {
+            if (session.timerHandle) {
+                clearInterval(session.timerHandle);
+                session.timerHandle = null;
+            }
+            session.loggedSets = [];
+            showPhase('setup');
+        }
+
         // ── XSS protection ─────────────────────────────────────────────────
         function escapeHtml(str) {
             return String(str ?? '')
@@ -1439,6 +1585,7 @@
             function pick(ex) {
                 input.value = ex.name;
                 hidden.value = ex.id;
+                hidden.dispatchEvent(new Event('change'));
                 list.classList.remove('open');
             }
 
@@ -2082,6 +2229,10 @@
                 document.getElementById('edit-add-set-btn').addEventListener('click', () => {
                     createSetRow(document.getElementById('edit-set-rows'));
                 });
+                initSetupForm();
+                initLogSetForm();
+                document.getElementById('cancel-session-btn').addEventListener('click', cancelSession);
+                document.getElementById('progression-dismiss').addEventListener('click', resetToSetup);
                 initTabs();
                 fetchWorkouts();
                 fetchTodayVolume();
