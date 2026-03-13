@@ -1676,6 +1676,90 @@
             }
         }
 
+        // ── Complete session ───────────────────────────────────────────────
+        async function completeSession() {
+            // Stop timer (spec: clear timer on Phase 3 entry)
+            if (session.timerHandle) {
+                clearInterval(session.timerHandle);
+                session.timerHandle = null;
+            }
+
+            const payload = {
+                exercise_id: session.exerciseId,
+                sets: session.loggedSets.map(s => ({ reps: s.reps, weight: s.weight, rir: s.rir })),
+            };
+            if (session.targetReps) {
+                payload.rep_range = session.targetReps;
+            }
+
+            let progression = null;
+            try {
+                const res = await fetch('/api/workouts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                if (!res.ok) throw new Error(`Add failed: ${res.status}`);
+                const data = await res.json();
+                progression = data.progression ?? null;
+
+                // Refresh workout list and stats in background
+                fetchWorkouts();
+                if (data.workout?.is_pr) launchConfetti();
+
+                // Persist suggested weight if applicable
+                if (progression?.flag_for_increase && progression?.suggested_weight != null) {
+                    try {
+                        await fetch(`/api/exercises/${session.exerciseId}/suggestion`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ suggested_weight: progression.suggested_weight }),
+                        });
+                        // Update local exercises cache so next session pre-fills correctly
+                        const ex = exercises.find(e => e.id === session.exerciseId);
+                        if (ex) ex.suggested_weight = progression.suggested_weight;
+                    } catch (patchErr) {
+                        console.error('Failed to save suggested weight:', patchErr);
+                        // Non-critical — session continues normally
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to complete session:', err);
+                // Show error and re-enable Log Set so user can retry
+                document.getElementById('session-error').classList.add('visible');
+                document.getElementById('log-set-btn').disabled = false;
+                session.loggedSets.pop(); // Remove the last set so retry is clean
+                updateSetCounter();
+                return;
+            }
+
+            // Transition to Phase 3
+            renderProgressionPanel(progression, session.exerciseName);
+            showPhase('complete');
+        }
+
+        function resetToSetup() {
+            // Clear session state
+            session.exerciseId = null;
+            session.exerciseName = '';
+            session.targetSets = 0;
+            session.targetReps = null;
+            session.restSeconds = 0;
+            session.loggedSets = [];
+
+            // Clear all setup form fields
+            document.getElementById('exercise-search').value = '';
+            document.getElementById('exercise_id').value = '';
+            document.getElementById('rep-range-min').value = '';
+            document.getElementById('rep-range-max').value = '';
+            document.getElementById('target-sets').value = '';
+            document.getElementById('rest-seconds').value = '';
+            document.getElementById('start-session-btn').disabled = true;
+            document.getElementById('rep-range-error').style.display = 'none';
+
+            showPhase('setup');
+        }
+
         // ── XSS protection ─────────────────────────────────────────────────
         function escapeHtml(str) {
             return String(str ?? '')
@@ -2114,7 +2198,8 @@
                 const content = document.getElementById('progression-content');
 
                 if (!progression) {
-                    panel.classList.remove('visible');
+                    // No progression data — show a plain complete message
+                    content.innerHTML = '<p style="color:#666;font-size:12px">Session saved.</p>';
                     return;
                 }
 
@@ -2158,13 +2243,9 @@
                         </div>`);
                 });
 
-                if (!parts.length) {
-                    panel.classList.remove('visible');
-                    return;
-                }
-
-                content.innerHTML = parts.join('');
-                panel.classList.add('visible');
+                content.innerHTML = parts.length
+                    ? parts.join('')
+                    : '<p style="color:#666;font-size:12px">Session saved. Keep it up.</p>';
             }
 
             // ── Tabs ───────────────────────────────────────────────────────────
