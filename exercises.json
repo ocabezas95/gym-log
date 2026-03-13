@@ -31,7 +31,8 @@
         "rep_range": [
             10,
             15
-        ]
+        ],
+        "suggested_weight": 140.0
     },
     {
         "id": 4,

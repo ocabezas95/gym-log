@@ -609,6 +609,24 @@
             background: rgba(233, 69, 96, 0.08);
         }
 
+        .view-btn {
+            background: transparent;
+            border: 1px solid #1e1e3a;
+            border-radius: 6px;
+            padding: 6px 10px;
+            color: #555;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .view-btn:hover {
+            border-color: #7c3aed;
+            color: #a78bfa;
+            background: rgba(124, 58, 237, 0.08);
+        }
+
         .edit-btn {
             background: transparent;
             border: 1px solid #1e1e3a;
@@ -1359,6 +1377,17 @@
     </div>
 
     <!-- EDIT MODAL -->
+    <!-- View Workout Modal -->
+    <div class="modal-backdrop" id="view-modal">
+        <div class="modal">
+            <div class="modal-title" id="view-modal-title">Workout</div>
+            <div id="view-modal-body" style="display:flex;flex-direction:column;gap:14px"></div>
+            <div class="modal-actions" style="margin-top:16px">
+                <button type="button" class="modal-cancel-btn" id="view-modal-close">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-backdrop" id="edit-modal">
         <div class="modal">
             <div class="modal-title">Edit Workout</div>
@@ -1391,6 +1420,7 @@
     <script>
         const API = '/api/workouts';
         let exercises = [];
+        let workoutsCache = {}; // id → workout, for View modal
 
         // ── Session state ──────────────────────────────────────────────────
         const session = {
@@ -1921,6 +1951,7 @@
 
         // ── Render workout list (grouped by date) ──────────────────────────
         function renderWorkouts(workouts) {
+            workoutsCache = Object.fromEntries(workouts.map(w => [w.id, w]));
             const list = document.getElementById('workout-list');
 
             if (workouts.length === 0) {
@@ -1999,6 +2030,7 @@
               </div>
             </div>
             <div style="display:flex">
+              <button class="view-btn" data-id="${w.id}">&#9432; View</button>
               <button class="edit-btn" data-id="${w.id}" data-exercise-id="${w.exercise_id}" data-name="${escapeHtml(w.exercise_name || '')}" data-sets="${setsJson}">✎ Edit</button>
               <button class="delete-btn" data-id="${w.id}">✕ Remove</button>
             </div>
@@ -2014,6 +2046,10 @@
 
             list.querySelectorAll('.delete-btn').forEach(btn => {
                 btn.addEventListener('click', () => deleteWorkout(Number(btn.dataset.id)));
+            });
+
+            list.querySelectorAll('.view-btn').forEach(btn => {
+                btn.addEventListener('click', () => openViewModal(workoutsCache[Number(btn.dataset.id)]));
             });
 
             list.querySelectorAll('.edit-btn').forEach(btn => {
@@ -2074,6 +2110,67 @@
 
             // ── Edit modal ────────────────────────────────────────────────────
             let editAC;
+
+            function openViewModal(w) {
+                if (!w) return;
+                const sets = Array.isArray(w.sets) ? w.sets : [{ reps: w.reps, weight: w.weight }];
+                const dateStr = new Date(w.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+
+                const setsHtml = sets.map((s, i) => `
+                    <div style="display:flex;gap:12px;font-size:12px;padding:6px 8px;background:#0f0f0f;border-radius:4px">
+                        <span style="color:#444;font-weight:600;width:20px">S${i + 1}</span>
+                        <span style="color:#aaa">${s.reps} reps</span>
+                        <span style="color:#aaa">${s.weight} lbs</span>
+                        ${s.rir != null ? `<span style="color:#666">RIR ${s.rir}</span>` : ''}
+                    </div>`).join('');
+
+                const p = w.progression;
+                let progressionHtml = '';
+                if (!p) {
+                    progressionHtml = '<p style="color:#555;font-size:11px">No analysis available for this workout.</p>';
+                } else {
+                    const parts = [];
+                    if (p.flag_for_increase) {
+                        parts.push(`<div style="background:#0a1a0a;border:1px solid #2dc653;border-radius:6px;padding:10px 12px;font-size:12px;color:#2dc653">
+                            <div style="font-weight:600;margin-bottom:4px">&#x2191; Ready to Progress</div>
+                            <div style="color:#aaa;font-size:11px">${escapeHtml(p.reason || '')}</div>
+                            ${p.suggested_weight != null ? `<div style="margin-top:6px;color:#2dc653">Suggested next weight: <strong>${p.suggested_weight} lbs</strong></div>` : ''}
+                        </div>`);
+                    }
+                    (p.rir_alerts || []).forEach(alert => {
+                        const isEasy = alert.type === 'too_easy';
+                        const bg = isEasy ? '#1a1800' : '#1a0808';
+                        const border = isEasy ? '#b45309' : '#e94560';
+                        const color = isEasy ? '#f59e0b' : '#e94560';
+                        const icon = isEasy ? '&#x26A1;' : '&#x26A0;';
+                        parts.push(`<div style="background:${bg};border:1px solid ${border};border-radius:6px;padding:10px 12px;font-size:12px;color:${color}">
+                            <div style="font-weight:600;margin-bottom:4px">${icon} ${isEasy ? 'Too Easy' : 'Failure Alert'}</div>
+                            <div style="color:#aaa;font-size:11px">${escapeHtml(alert.message)}</div>
+                            ${alert.suggested_weight != null ? `<div style="margin-top:6px">Suggested weight: <strong>${alert.suggested_weight} lbs</strong></div>` : ''}
+                        </div>`);
+                    });
+                    if (!parts.length) {
+                        parts.push('<p style="color:#555;font-size:11px">Session completed. No progression flags.</p>');
+                    }
+                    progressionHtml = parts.join('');
+                }
+
+                document.getElementById('view-modal-title').textContent = `${w.exercise_name || 'Workout'} — ${dateStr}`;
+                document.getElementById('view-modal-body').innerHTML = `
+                    <div>
+                        <div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Sets</div>
+                        <div style="display:flex;flex-direction:column;gap:4px">${setsHtml}</div>
+                    </div>
+                    <div>
+                        <div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Analysis</div>
+                        <div style="display:flex;flex-direction:column;gap:8px">${progressionHtml}</div>
+                    </div>`;
+                document.getElementById('view-modal').classList.add('open');
+            }
+
+            function closeViewModal() {
+                document.getElementById('view-modal').classList.remove('open');
+            }
 
             function openEditModal(workout) {
                 document.getElementById('edit-id').value = workout.id;
@@ -2461,6 +2558,8 @@
                 initLogSetForm();
                 document.getElementById('cancel-session-btn').addEventListener('click', cancelSession);
                 document.getElementById('progression-dismiss').addEventListener('click', resetToSetup);
+                document.getElementById('view-modal-close').addEventListener('click', closeViewModal);
+                document.getElementById('view-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeViewModal(); });
                 initTabs();
                 fetchWorkouts();
                 fetchTodayVolume();

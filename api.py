@@ -138,10 +138,11 @@ def add_workout(workout: Workout):
         "volume": volume
     }
 
+    progression = ProgressionEngine(exercises).analyze(new_workout)
+    new_workout["progression"] = progression
+
     workouts.append(new_workout)
     save_workouts(workouts)
-
-    progression = ProgressionEngine(exercises).analyze(new_workout)
 
     return {"workout": new_workout, "progression": progression}
 
