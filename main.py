@@ -10,16 +10,36 @@ def load_exercises():
         return json.load(file)
 
 # load workouts from file
-def load_workouts():
+def _load_workouts_file():
+    """Return the raw workouts file dict, handling both old (array) and new (object) formats."""
     if not os.path.exists('workouts.json'):
-        return []
+        return {'workouts': [], 'suggestions': {}}
     with open('workouts.json', 'r') as file:
-        return json.load(file)
+        data = json.load(file)
+    if isinstance(data, list):
+        return {'workouts': data, 'suggestions': {}}
+    return data
+
+def load_workouts():
+    return _load_workouts_file()['workouts']
+
+def load_suggestions():
+    """Return the suggestions dict: {exercise_id_str: suggested_weight}."""
+    return _load_workouts_file().get('suggestions', {})
 
 # save workouts to file
 def save_workouts(workouts):
+    data = _load_workouts_file()
+    data['workouts'] = workouts
     with open('workouts.json', 'w') as file:
-        json.dump(workouts, file, indent=4)
+        json.dump(data, file, indent=4)
+
+def save_suggestions(suggestions):
+    """Persist the suggestions dict to workouts.json."""
+    data = _load_workouts_file()
+    data['suggestions'] = suggestions
+    with open('workouts.json', 'w') as file:
+        json.dump(data, file, indent=4)
 
 # save exercises to file
 def save_exercises(exercises):

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel, field_validator
 from fastapi import HTTPException
-from main import load_workouts, save_workouts, load_exercises, save_exercises
+from main import load_workouts, save_workouts, load_exercises, load_suggestions, save_suggestions
 from fastapi.staticfiles import StaticFiles
 from fastapi import HTTPException
 from datetime import datetime
@@ -44,7 +44,14 @@ def home():
 
 @app.get("/api/exercises")
 def get_exercises():
-    return load_exercises()
+    exercises = load_exercises()
+    suggestions = load_suggestions()
+    for e in exercises:
+        e.pop('suggested_weight', None)
+        suggestion = suggestions.get(str(e['id']))
+        if suggestion is not None:
+            e['suggested_weight'] = suggestion
+    return exercises
 
 
 @app.get("/api/workouts")
@@ -186,8 +193,9 @@ def update_suggestion(exercise_id: int, body: SuggestionUpdate):
     exercise = next((e for e in exercises if e["id"] == exercise_id), None)
     if not exercise:
         raise HTTPException(status_code=404, detail="Exercise not found")
-    exercise["suggested_weight"] = body.suggested_weight
-    save_exercises(exercises)
+    suggestions = load_suggestions()
+    suggestions[str(exercise_id)] = body.suggested_weight
+    save_suggestions(suggestions)
     return {"id": exercise_id, "suggested_weight": body.suggested_weight}
 
 

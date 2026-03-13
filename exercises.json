@@ -8,8 +8,7 @@
         "rep_range": [
             8,
             12
-        ],
-        "suggested_weight": 145.0
+        ]
     },
     {
         "id": 2,
@@ -31,8 +30,7 @@
         "rep_range": [
             10,
             15
-        ],
-        "suggested_weight": 140.0
+        ]
     },
     {
         "id": 4,
@@ -329,8 +327,7 @@
         "rep_range": [
             10,
             15
-        ],
-        "suggested_weight": 40.0
+        ]
     },
     {
         "id": 31,
