@@ -1,7 +1,7 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from fastapi import HTTPException
-from main import load_workouts, save_workouts, load_exercises
+from main import load_workouts, save_workouts, load_exercises, save_exercises
 from fastapi.staticfiles import StaticFiles
 from fastapi import HTTPException
 from datetime import datetime
@@ -24,6 +24,17 @@ class Workout(BaseModel):
     exercise_id: int
     sets: List[SetEntry]
     rep_range: Optional[List[int]] = None
+
+
+class SuggestionUpdate(BaseModel):
+    suggested_weight: float
+
+    @field_validator("suggested_weight")
+    @classmethod
+    def must_be_non_negative(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("suggested_weight must be non-negative")
+        return v
 
 
 @app.get("/api")
@@ -166,6 +177,17 @@ def delete_workout(workout_id: int):
     save_workouts(workouts)
 
     return {"message": "Workout deleted successfully"}
+
+
+@app.patch("/api/exercises/{exercise_id}/suggestion")
+def update_suggestion(exercise_id: int, body: SuggestionUpdate):
+    exercises = load_exercises()
+    exercise = next((e for e in exercises if e["id"] == exercise_id), None)
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+    exercise["suggested_weight"] = body.suggested_weight
+    save_exercises(exercises)
+    return {"id": exercise_id, "suggested_weight": body.suggested_weight}
 
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
