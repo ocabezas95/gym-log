@@ -1710,19 +1710,26 @@
                 if (data.workout?.is_pr) launchConfetti();
 
                 // Persist suggested weight if applicable
+                // Priority: flag_for_increase > failure alert > too_easy alert
+                let weightToSave = null;
                 if (progression?.flag_for_increase && progression?.suggested_weight != null) {
+                    weightToSave = progression.suggested_weight;
+                } else if (progression?.rir_alerts?.length > 0) {
+                    const failureAlert = progression.rir_alerts.find(a => a.type === 'failure' && a.suggested_weight != null);
+                    const tooEasyAlert = progression.rir_alerts.find(a => a.type === 'too_easy' && a.suggested_weight != null);
+                    weightToSave = (failureAlert ?? tooEasyAlert)?.suggested_weight ?? null;
+                }
+                if (weightToSave != null) {
                     try {
                         await fetch(`/api/exercises/${session.exerciseId}/suggestion`, {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ suggested_weight: progression.suggested_weight }),
+                            body: JSON.stringify({ suggested_weight: weightToSave }),
                         });
-                        // Update local exercises cache so next session pre-fills correctly
                         const ex = exercises.find(e => e.id === session.exerciseId);
-                        if (ex) ex.suggested_weight = progression.suggested_weight;
+                        if (ex) ex.suggested_weight = weightToSave;
                     } catch (patchErr) {
                         console.error('Failed to save suggested weight:', patchErr);
-                        // Non-critical — session continues normally
                     }
                 }
             } catch (err) {
